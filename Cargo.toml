@@ -1,0 +1,9 @@
+[package]
+name = "jaegercat"
+version = "0.1.0"
+authors = ["Takeru Ohta <phjgt308@gmail.com>"]
+
+[dependencies]
+clap = "2"
+thrift_codec = "0.1"
+trackable = "0.2"
