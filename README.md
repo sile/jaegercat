@@ -15,7 +15,7 @@ Install
 A precompiled binary for Linux environment is available in the [releases] page.
 
 ```console
-$ curl https://github.com/sile/jaegercat/releases/download/0.1.0/jaegercat-0.1.0.linux -o jaegercat
+$ curl -L https://github.com/sile/jaegercat/releases/download/0.1.0/jaegercat-0.1.0.linux -o jaegercat
 $ chmod +x jaegercat
 $ ./jaegercat -h
 jaegercat 0.1.0
