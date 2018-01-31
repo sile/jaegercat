@@ -3,7 +3,7 @@ use chrono::{Local, NaiveDateTime, TimeZone};
 use thrift_codec::{BinaryDecode, CompactDecode};
 use thrift_codec::data::{Data, DataRef, List, Struct};
 use thrift_codec::message::{Message, MessageKind};
-use trackable::error::{Failed, Failure};
+use trackable::error::{ErrorKindExt, Failed, Failure};
 
 use Result;
 
@@ -22,10 +22,10 @@ impl EmitBatchNotification {
     pub fn decode(mut buf: &[u8], protocol: Protocol) -> Result<Self> {
         let message = match protocol {
             Protocol::Compact => {
-                track!(Message::compact_decode(&mut buf).map_err(Failure::from_error))?
+                track!(Message::compact_decode(&mut buf).map_err(|e| Failed.takes_over(e)))?
             }
             Protocol::Binary => {
-                track!(Message::binary_decode(&mut buf).map_err(Failure::from_error))?
+                track!(Message::binary_decode(&mut buf).map_err(|e| Failed.takes_over(e)))?
             }
         };
         track_assert_eq!(message.method_name(), "emitBatch", Failed);
