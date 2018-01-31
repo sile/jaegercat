@@ -69,6 +69,24 @@ $ jaegercat
 {"emit_batch":{"process":{"service_name":"example","tags":{"hello":"world","hostname":"DESKTOP-FJQCKIF","jaeger.version":"rustracing_jaeger-0.1.3"}},"spans":[{"trace_id":"0x154050ce43d48b612ae64ad7cd070e8e","span_id":"0x4c123d1fd41219d5","parent_span_id":"0x87a5fd207c065420","operation_name":"sub","references":[{"ChildOf":{"trace_id":"0x154050ce43d48b612ae64ad7cd070e8e","span_id":"0x87a5fd207c065420"}}],"flags":1,"start_datetime":"2018-01-31 14:24:18","start_unixtime":1517376258.665418,"duration":0.010196,"tags":{"foo":"bar"},"logs":[{"datetime":"2018-01-31 14:24:18","unixtime":1517376258.665475,"fields":{"event":"error","message":"something wrong"}}]},{"trace_id":"0x154050ce43d48b612ae64ad7cd070e8e","span_id":"0x87a5fd207c065420","operation_name":"main","flags":1,"start_datetime":"2018-01-31 14:24:18","start_unixtime":1517376258.654844,"duration":0.020779}]}}
 ```
 
+### Using [`jq`][jq] command
+
+It is convenient to use [`jq`][jq] command for processing the resulting JSON.
+
+```console
+// Filter only spans whose operation name is "main".
+$ jaegercat | jq '.emit_batch.spans[] | select(.operation_name == "main")'
+{
+  "trace_id": "0x3dfcffdfe5b53b1d1fb792d1fbea9f8b",
+  "span_id": "0xeba0e30f2f2d6e51",
+  "operation_name": "main",
+  "flags": 1,
+  "start_datetime": "2018-01-31 14:36:01",
+  "start_unixtime": 1517376961.354905,
+  "duration": 0.020933
+}
+```
+
 [jaeger]: https://jaeger.readthedocs.io/
 [cargo]: https://doc.rust-lang.org/cargo/
 [jq]: https://stedolan.github.io/jq/
