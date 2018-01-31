@@ -7,9 +7,8 @@ extern crate sloggers;
 #[macro_use]
 extern crate trackable;
 
-use std::io;
+use std::io::{self, Write};
 use std::net::{SocketAddr, UdpSocket};
-use std::sync::mpsc;
 use std::thread;
 use clap::{App, Arg};
 use jaegercat::thrift::{EmitBatchNotification, Protocol};
@@ -79,61 +78,66 @@ fn main() {
             .level(log_level)
             .build()
     );
-    let (tx, rx) = mpsc::channel();
+
+    let mut threads = Vec::new();
     for (port, protocol) in [
         (compact_thrift_port, Protocol::Compact),
         (binary_thrift_port, Protocol::Binary),
     ].iter()
         .cloned()
     {
-        let tx = tx.clone();
         let addr: SocketAddr = try_parse!(format!("0.0.0.0:{}", port));
         let socket = track_try_unwrap!(UdpSocket::bind(addr).map_err(Failure::from_error));
         let logger = logger.new(o!("port" => port, "thrift_protocol" => format!("{:?}", protocol)));
         info!(logger, "UDP server started");
 
-        thread::spawn(move || {
+        let thread = thread::spawn(move || {
             let mut buf = vec![0; udp_buffer_size];
             loop {
                 let (recv_size, peer) =
                     track_try_unwrap!(socket.recv_from(&mut buf).map_err(Failure::from_error));
                 debug!(logger, "Received {} bytes from {}", recv_size, peer);
-                let bytes = Vec::from(&buf[..recv_size]);
-                match track!(EmitBatchNotification::decode(&bytes, protocol)) {
+                let mut bytes = &buf[..recv_size];
+                match track!(EmitBatchNotification::decode(bytes, protocol)) {
                     Err(e) => {
                         error!(logger, "Received malformed or unknown message: {}", e);
                         debug!(logger, "Bytes: {:?}", bytes);
                     }
                     Ok(message) => {
-                        if tx.send((message, bytes)).is_err() {
-                            return;
+                        let stdout = io::stdout();
+                        let mut stdout = stdout.lock();
+                        match format {
+                            Format::Raw => {
+                                track_try_unwrap!(
+                                    io::copy(&mut bytes, &mut stdout).map_err(Failure::from_error)
+                                );
+                            }
+                            Format::Json => {
+                                let json = track_try_unwrap!(serdeconv::to_json_string(&message));
+                                track_try_unwrap!(
+                                    writeln!(stdout, "{}", json).map_err(Failure::from_error)
+                                );
+                            }
+                            Format::JsonPretty => {
+                                let json =
+                                    track_try_unwrap!(serdeconv::to_json_string_pretty(&message));
+                                track_try_unwrap!(
+                                    writeln!(stdout, "{}", json).map_err(Failure::from_error)
+                                );
+                            }
                         }
                     }
                 }
             }
         });
+        threads.push(thread);
     }
-
-    loop {
-        let (message, bytes) = track_try_unwrap!(rx.recv().map_err(Failure::from_error));
-        match format {
-            Format::Raw => {
-                track_try_unwrap!(
-                    io::copy(&mut &bytes[..], &mut io::stdout()).map_err(Failure::from_error)
-                );
-            }
-            Format::Json => {
-                let json = track_try_unwrap!(serdeconv::to_json_string(&message));
-                println!("{}", json);
-            }
-            Format::JsonPretty => {
-                let json = track_try_unwrap!(serdeconv::to_json_string_pretty(&message));
-                println!("{}", json);
-            }
-        }
+    for t in threads {
+        let _ = t.join();
     }
 }
 
+#[derive(Clone, Copy)]
 enum Format {
     Raw,
     Json,
