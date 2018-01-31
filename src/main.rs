@@ -12,7 +12,7 @@ use std::net::{SocketAddr, UdpSocket};
 use std::sync::mpsc;
 use std::thread;
 use clap::{App, Arg};
-use jaegercat::thrift::EmitBatchNotification;
+use jaegercat::thrift::{EmitBatchNotification, Protocol};
 use sloggers::Build;
 use sloggers::terminal::{Destination, TerminalLoggerBuilder};
 use sloggers::types::SourceLocation;
@@ -80,11 +80,16 @@ fn main() {
             .build()
     );
     let (tx, rx) = mpsc::channel();
-    for port in [compact_thrift_port, binary_thrift_port].iter().cloned() {
+    for (port, protocol) in [
+        (compact_thrift_port, Protocol::Compact),
+        (binary_thrift_port, Protocol::Binary),
+    ].iter()
+        .cloned()
+    {
         let tx = tx.clone();
         let addr: SocketAddr = try_parse!(format!("0.0.0.0:{}", port));
         let socket = track_try_unwrap!(UdpSocket::bind(addr).map_err(Failure::from_error));
-        let logger = logger.new(o!("port" => port));
+        let logger = logger.new(o!("port" => port, "thrift_protocol" => format!("{:?}", protocol)));
         info!(logger, "UDP server started");
 
         thread::spawn(move || {
@@ -94,7 +99,7 @@ fn main() {
                     track_try_unwrap!(socket.recv_from(&mut buf).map_err(Failure::from_error));
                 debug!(logger, "Received {} bytes from {}", recv_size, peer);
                 let bytes = Vec::from(&buf[..recv_size]);
-                match track!(EmitBatchNotification::decode(&bytes)) {
+                match track!(EmitBatchNotification::decode(&bytes, protocol)) {
                     Err(e) => {
                         error!(logger, "Received malformed or unknown message: {}", e);
                         debug!(logger, "Bytes: {:?}", bytes);

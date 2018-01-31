@@ -1,11 +1,17 @@
 use std::collections::BTreeMap;
 use chrono::{Local, NaiveDateTime, TimeZone};
-use thrift_codec::CompactDecode;
+use thrift_codec::{BinaryDecode, CompactDecode};
 use thrift_codec::data::{Data, DataRef, List, Struct};
 use thrift_codec::message::{Message, MessageKind};
 use trackable::error::{Failed, Failure};
 
 use Result;
+
+#[derive(Debug, Clone, Copy)]
+pub enum Protocol {
+    Compact,
+    Binary,
+}
 
 #[derive(Debug, Serialize)]
 pub struct EmitBatchNotification {
@@ -13,8 +19,15 @@ pub struct EmitBatchNotification {
     pub batch: Batch,
 }
 impl EmitBatchNotification {
-    pub fn decode(mut buf: &[u8]) -> Result<Self> {
-        let message = track_try_unwrap!(Message::compact_decode(&mut buf));
+    pub fn decode(mut buf: &[u8], protocol: Protocol) -> Result<Self> {
+        let message = match protocol {
+            Protocol::Compact => {
+                track!(Message::compact_decode(&mut buf).map_err(Failure::from_error))?
+            }
+            Protocol::Binary => {
+                track!(Message::binary_decode(&mut buf).map_err(Failure::from_error))?
+            }
+        };
         track_assert_eq!(message.method_name(), "emitBatch", Failed);
         track_assert_eq!(message.kind(), MessageKind::Oneway, Failed);
         let batch = track!(Batch::try_from(message.body()))?;
@@ -193,8 +206,8 @@ impl Span {
 fn unixtime_to_datetime(unixtime_us: i64) -> String {
     Local
         .from_utc_datetime(&NaiveDateTime::from_timestamp(
-            unixtime_us / 1000_000,
-            (unixtime_us % 1000_000 * 1000) as u32,
+            unixtime_us / 1_000_000,
+            (unixtime_us % 1_000_000 * 1000) as u32,
         ))
         .format("%Y-%m-%d %H:%M:%S")
         .to_string()
