@@ -1,3 +1,7 @@
+extern crate chrono;
+extern crate serde;
+#[macro_use]
+extern crate serde_derive;
 extern crate thrift_codec;
 #[macro_use]
 extern crate trackable;

@@ -1,5 +1,6 @@
 extern crate clap;
 extern crate jaegercat;
+extern crate serdeconv;
 #[macro_use]
 extern crate slog;
 extern crate sloggers;
@@ -43,7 +44,7 @@ fn main() {
                 .long("format")
                 .takes_value(true)
                 .default_value("json")
-                .possible_values(&["raw", "json"]),
+                .possible_values(&["raw", "json", "json-pretty"]),
         )
         .arg(
             Arg::with_name("UDP_BUFFER_SIZE")
@@ -57,7 +58,7 @@ fn main() {
                 .long("log-level")
                 .takes_value(true)
                 .default_value("info")
-                .possible_values(&["debug", "info", "warning", "error"]),
+                .possible_values(&["debug", "info", "error"]),
         )
         .get_matches();
 
@@ -67,6 +68,7 @@ fn main() {
     let format = match matches.value_of("FORMAT").unwrap() {
         "raw" => Format::Raw,
         "json" => Format::Json,
+        "json-pretty" => Format::JsonPretty,
         _ => unreachable!(),
     };
     let log_level = try_parse!(matches.value_of("LOG_LEVEL").unwrap());
@@ -116,8 +118,12 @@ fn main() {
                 );
             }
             Format::Json => {
-                //
-                unimplemented!()
+                let json = track_try_unwrap!(serdeconv::to_json_string(&message));
+                println!("{}", json);
+            }
+            Format::JsonPretty => {
+                let json = track_try_unwrap!(serdeconv::to_json_string_pretty(&message));
+                println!("{}", json);
             }
         }
     }
@@ -126,4 +132,5 @@ fn main() {
 enum Format {
     Raw,
     Json,
+    JsonPretty,
 }

@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+use chrono::{Local, NaiveDateTime, TimeZone};
 use thrift_codec::CompactDecode;
 use thrift_codec::data::{Data, DataRef, List, Struct};
 use thrift_codec::message::{Message, MessageKind};
@@ -5,8 +7,9 @@ use trackable::error::{Failed, Failure};
 
 use Result;
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct EmitBatchNotification {
+    #[serde(rename = "emit_batch")]
     pub batch: Batch,
 }
 impl EmitBatchNotification {
@@ -19,7 +22,7 @@ impl EmitBatchNotification {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct Batch {
     pub process: Process,
     pub spans: Vec<Span>,
@@ -39,21 +42,53 @@ impl Batch {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct Process {
     pub service_name: String,
-    pub tags: Vec<Tag>,
+    pub tags: Tags,
 }
 impl Process {
     fn try_from(f: &Struct) -> Result<Self> {
         let service_name = track!(f.string_field(1))?;
-        let tags = track!(f.list_field(2).and_then(|x| Tag::try_from_list(&x)))?;
+        let tags = track!(f.list_field(2).and_then(|x| Tags::try_from_list(&x)))?;
         Ok(Process { service_name, tags })
     }
 }
 
-#[derive(Debug)]
-pub enum Tag {
+#[derive(Debug, Serialize)]
+pub struct Tags(pub BTreeMap<String, TagValue>);
+impl Tags {
+    fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+    fn try_from_list(f: &List) -> Result<Self> {
+        let mut map = BTreeMap::new();
+        for data in f.iter() {
+            let tag = track!(Tag::try_from_data(&data))?;
+            let (key, value) = match tag {
+                Tag::Bool { key, value } => (key, TagValue::Bool(value)),
+                Tag::Long { key, value } => (key, TagValue::I64(value)),
+                Tag::Double { key, value } => (key, TagValue::F64(value)),
+                Tag::String { key, value } => (key, TagValue::String(value)),
+                Tag::Binary { key, value } => (key, TagValue::Binary(value)),
+            };
+            map.insert(key, value);
+        }
+        Ok(Tags(map))
+    }
+}
+
+#[derive(Debug, Serialize)]
+#[serde(untagged)]
+pub enum TagValue {
+    Bool(bool),
+    I64(i64),
+    F64(f64),
+    String(String),
+    Binary(Vec<u8>),
+}
+
+enum Tag {
     String { key: String, value: String },
     Double { key: String, value: f64 },
     Bool { key: String, value: bool },
@@ -61,13 +96,6 @@ pub enum Tag {
     Binary { key: String, value: Vec<u8> },
 }
 impl Tag {
-    fn try_from_list(f: &List) -> Result<Vec<Self>> {
-        track!(
-            f.iter()
-                .map(|x| Tag::try_from_data(&x))
-                .collect::<Result<Vec<_>>>()
-        )
-    }
     fn try_from_data(f: &DataRef) -> Result<Self> {
         let s = if let DataRef::Struct(s) = *f {
             s
@@ -103,68 +131,79 @@ impl Tag {
     }
 }
 
-#[derive(Debug)]
+fn trace_id(high: i64, low: i64) -> String {
+    if high == 0 {
+        format!("0x{:x}", low)
+    } else {
+        format!("0x{:x}{:016x}", high, low)
+    }
+}
+
+fn span_id(id: i64) -> String {
+    if id == 0 {
+        "".to_owned()
+    } else {
+        format!("0x{:x}", id)
+    }
+}
+
+#[derive(Debug, Serialize)]
 pub struct Span {
-    pub trace_id_low: i64,
-    pub trace_id_high: i64,
-    pub span_id: i64,
-    pub parent_span_id: i64,
+    pub trace_id: String,
+    pub span_id: String,
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub parent_span_id: String,
     pub operation_name: String,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     pub references: Vec<SpanRef>,
     pub flags: i32,
-    pub start_time: i64,
-    pub duration: i64,
-    pub tags: Vec<Tag>,
+    pub start_datetime: String,
+    pub start_unixtime: f64,
+    pub duration: f64, // seconds
+    #[serde(skip_serializing_if = "Tags::is_empty")]
+    pub tags: Tags,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     pub logs: Vec<Log>,
 }
 impl Span {
-    pub fn trace_id(&self) -> String {
-        format!(
-            "0x{:016x}{:016x}",
-            self.trace_id_high as u64, self.trace_id_low as u64
-        )
-    }
-    pub fn span_id(&self) -> String {
-        format!("0x{:016x}", self.span_id as u64)
-    }
-    pub fn parent_span_id(&self) -> String {
-        format!("0x{:016x}", self.parent_span_id as u64)
-    }
-
     fn try_from_data(f: &DataRef) -> Result<Self> {
         let s = if let DataRef::Struct(s) = *f {
             s
         } else {
             track_panic!(Failed, "Not a struct: {:?}", f);
         };
+        let start_time_us = track!(s.i64_field(8))?;
+        let duration_us = track!(s.i64_field(9))?;
         Ok(Span {
-            trace_id_low: track!(s.i64_field(1))?,
-            trace_id_high: track!(s.i64_field(2))?,
-            span_id: track!(s.i64_field(3))?,
-            parent_span_id: track!(s.i64_field(4))?,
+            trace_id: trace_id(track!(s.i64_field(2))?, track!(s.i64_field(1))?),
+            span_id: span_id(track!(s.i64_field(3))?),
+            parent_span_id: span_id(track!(s.i64_field(4))?),
             operation_name: track!(s.string_field(5))?,
             references: track!(s.list_field(6).and_then(|x| SpanRef::try_from_list(&x)))?,
             flags: track!(s.i32_field(7))?,
-            start_time: track!(s.i64_field(8))?,
-            duration: track!(s.i64_field(9))?,
-            tags: track!(s.list_field(10).and_then(|x| Tag::try_from_list(&x)))?,
+            start_unixtime: start_time_us as f64 / 1000_000.0,
+            start_datetime: unixtime_to_datetime(start_time_us),
+            duration: duration_us as f64 / 1000_000.0,
+            tags: track!(s.list_field(10).and_then(|x| Tags::try_from_list(&x)))?,
             logs: track!(s.list_field(11).and_then(|x| Log::try_from_list(&x)))?,
         })
     }
 }
 
-#[derive(Debug)]
+fn unixtime_to_datetime(unixtime_us: i64) -> String {
+    Local
+        .from_utc_datetime(&NaiveDateTime::from_timestamp(
+            unixtime_us / 1000_000,
+            (unixtime_us % 1000_000 * 1000) as u32,
+        ))
+        .format("%Y-%m-%d %H:%M:%S")
+        .to_string()
+}
+
+#[derive(Debug, Serialize)]
 pub enum SpanRef {
-    ChildOf {
-        trace_id_low: i64,
-        trace_id_high: i64,
-        span_id: i64,
-    },
-    FollowsFrom {
-        trace_id_low: i64,
-        trace_id_high: i64,
-        span_id: i64,
-    },
+    ChildOf { trace_id: String, span_id: String },
+    FollowsFrom { trace_id: String, span_id: String },
 }
 impl SpanRef {
     fn try_from_list(f: &List) -> Result<Vec<Self>> {
@@ -182,29 +221,21 @@ impl SpanRef {
         };
 
         let kind = track!(s.i32_field(1))?;
-        let trace_id_low = track!(s.i64_field(2))?;
-        let trace_id_high = track!(s.i64_field(3))?;
-        let span_id = track!(s.i64_field(4))?;
+        let trace_id = trace_id(track!(s.i64_field(3))?, track!(s.i64_field(2))?);
+        let span_id = span_id(track!(s.i64_field(4))?);
         Ok(match kind {
-            0 => SpanRef::ChildOf {
-                trace_id_low,
-                trace_id_high,
-                span_id,
-            },
-            1 => SpanRef::FollowsFrom {
-                trace_id_low,
-                trace_id_high,
-                span_id,
-            },
+            0 => SpanRef::ChildOf { trace_id, span_id },
+            1 => SpanRef::FollowsFrom { trace_id, span_id },
             _ => track_panic!(Failed, "Unknown span reference kind: {}", kind),
         })
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct Log {
-    pub timestamp: i64,
-    pub fields: Vec<Tag>,
+    pub datetime: String,
+    pub unixtime: f64,
+    pub fields: Tags,
 }
 impl Log {
     fn try_from_list(f: &List) -> Result<Vec<Self>> {
@@ -221,9 +252,13 @@ impl Log {
             track_panic!(Failed, "Not a struct: {:?}", f);
         };
 
-        let timestamp = track!(s.i64_field(1))?;
-        let fields = track!(s.list_field(2).and_then(|x| Tag::try_from_list(&x)))?;
-        Ok(Log { timestamp, fields })
+        let timestamp_us = track!(s.i64_field(1))?;
+        let fields = track!(s.list_field(2).and_then(|x| Tags::try_from_list(&x)))?;
+        Ok(Log {
+            unixtime: timestamp_us as f64 / 1000_000.0,
+            datetime: unixtime_to_datetime(timestamp_us),
+            fields,
+        })
     }
 }
 

@@ -1,2 +1,6 @@
 jaegercat
 =========
+
+```
+$ jaegercat | jq
+```
