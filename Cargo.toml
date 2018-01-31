@@ -2,6 +2,12 @@
 name = "jaegercat"
 version = "0.1.0"
 authors = ["Takeru Ohta <phjgt308@gmail.com>"]
+description = "A handy command line tool showing traces emitted by Jaeger clients"
+homepage = "https://github.com/sile/jaegercat"
+repository = "https://github.com/sile/jaegercat"
+readme = "README.md"
+keywords = ["jaeger"]
+license = "MIT"
 
 [dependencies]
 chrono = "0.4"
