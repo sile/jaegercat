@@ -15,10 +15,10 @@ Install
 A precompiled binary for Linux environment is available in the [releases] page.
 
 ```console
-$ curl -L https://github.com/sile/jaegercat/releases/download/0.1.0/jaegercat-0.1.0.linux -o jaegercat
+$ curl -L https://github.com/sile/jaegercat/releases/download/0.1.1/jaegercat-0.1.1.linux -o jaegercat
 $ chmod +x jaegercat
 $ ./jaegercat -h
-jaegercat 0.1.0
+jaegercat 0.1.1
 
 USAGE:
     jaegercat [OPTIONS]
@@ -87,7 +87,16 @@ $ jaegercat | jq '.emit_batch.spans[] | select(.operation_name == "main")'
 }
 ```
 
+References
+-----------
+
+Jaeger Data Model(IDL):
+- [agent.thrift]
+- [jaeger.thrift]
+
 [jaeger]: https://jaeger.readthedocs.io/
 [cargo]: https://doc.rust-lang.org/cargo/
 [jq]: https://stedolan.github.io/jq/
 [releases]: https://github.com/sile/jaegercat/releases
+[agent.thrift]: https://github.com/jaegertracing/jaeger-idl/blob/master/thrift/agent.thrift
+[jaeger.thrift]: https://github.com/jaegertracing/jaeger-idl/blob/master/thrift/jaeger.thrift
