@@ -194,9 +194,9 @@ impl Span {
             operation_name: track!(s.string_field(5))?,
             references: track!(s.list_field(6).and_then(|x| SpanRef::try_from_list(&x)))?,
             flags: track!(s.i32_field(7))?,
-            start_unixtime: start_time_us as f64 / 1000_000.0,
+            start_unixtime: start_time_us as f64 / 1_000_000.0,
             start_datetime: unixtime_to_datetime(start_time_us),
-            duration: duration_us as f64 / 1000_000.0,
+            duration: duration_us as f64 / 1_000_000.0,
             tags: track!(s.list_field(10).and_then(|x| Tags::try_from_list(&x)))?,
             logs: track!(s.list_field(11).and_then(|x| Log::try_from_list(&x)))?,
         })
@@ -268,7 +268,7 @@ impl Log {
         let timestamp_us = track!(s.i64_field(1))?;
         let fields = track!(s.list_field(2).and_then(|x| Tags::try_from_list(&x)))?;
         Ok(Log {
-            unixtime: timestamp_us as f64 / 1000_000.0,
+            unixtime: timestamp_us as f64 / 1_000_000.0,
             datetime: unixtime_to_datetime(timestamp_us),
             fields,
         })
