@@ -1,3 +1,4 @@
+#[macro_use]
 extern crate clap;
 extern crate jaegercat;
 extern crate serdeconv;
@@ -7,7 +8,7 @@ extern crate sloggers;
 #[macro_use]
 extern crate trackable;
 
-use clap::{App, Arg};
+use clap::Arg;
 use jaegercat::thrift::{EmitBatchNotification, Protocol};
 use sloggers::terminal::{Destination, TerminalLoggerBuilder};
 use sloggers::types::SourceLocation;
@@ -24,9 +25,7 @@ macro_rules! try_parse {
 }
 
 fn main() {
-    let matches = App::new("jaegercat")
-        .version(env!("CARGO_PKG_VERSION"))
-        .about(env!("CARGO_PKG_DESCRIPTION"))
+    let matches = app_from_crate!()
         .arg(
             Arg::with_name("COMPACT_THRIFT_PORT")
                 .long("compact-thrift-port")
