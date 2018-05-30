@@ -1,8 +1,8 @@
-use std::collections::BTreeMap;
 use chrono::{Local, NaiveDateTime, TimeZone};
-use thrift_codec::{BinaryDecode, CompactDecode};
+use std::collections::BTreeMap;
 use thrift_codec::data::{Data, DataRef, List, Struct};
 use thrift_codec::message::{Message, MessageKind};
+use thrift_codec::{BinaryDecode, CompactDecode};
 use trackable::error::{ErrorKindExt, Failed, Failure};
 
 use Result;

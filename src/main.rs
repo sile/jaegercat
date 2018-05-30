@@ -7,18 +7,20 @@ extern crate sloggers;
 #[macro_use]
 extern crate trackable;
 
+use clap::{App, Arg};
+use jaegercat::thrift::{EmitBatchNotification, Protocol};
+use sloggers::terminal::{Destination, TerminalLoggerBuilder};
+use sloggers::types::SourceLocation;
+use sloggers::Build;
 use std::io::{self, Write};
 use std::net::{SocketAddr, UdpSocket};
 use std::thread;
-use clap::{App, Arg};
-use jaegercat::thrift::{EmitBatchNotification, Protocol};
-use sloggers::Build;
-use sloggers::terminal::{Destination, TerminalLoggerBuilder};
-use sloggers::types::SourceLocation;
 use trackable::error::Failure;
 
 macro_rules! try_parse {
-    ($expr:expr) => { track_try_unwrap!($expr.parse().map_err(Failure::from_error)) }
+    ($expr:expr) => {
+        track_try_unwrap!($expr.parse().map_err(Failure::from_error))
+    };
 }
 
 fn main() {
