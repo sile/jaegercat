@@ -16,6 +16,6 @@ serde = "1"
 serde_derive = "1"
 serdeconv = "0.3"
 slog = {version = "2", features = ["release_max_level_debug"]}
-sloggers = "0.2"
+sloggers = "2"
 thrift_codec = "0.1"
 trackable = "0.2"
