@@ -45,12 +45,10 @@ impl Batch {
         let s0 = track!(f.struct_field(1))?;
         let s1 = track!(s0.struct_field(1))?;
         let process = track!(Process::try_from(&s1))?;
-        let spans = track!(
-            track!(s0.list_field(2))?
-                .iter()
-                .map(|x| Span::try_from_data(&x))
-                .collect::<Result<Vec<_>>>()
-        )?;
+        let spans = track!(track!(s0.list_field(2))?
+            .iter()
+            .map(|x| Span::try_from_data(&x))
+            .collect::<Result<Vec<_>>>())?;
         Ok(Batch { process, spans })
     }
 }
@@ -205,10 +203,13 @@ impl Span {
 
 fn unixtime_to_datetime(unixtime_us: i64) -> String {
     Local
-        .from_utc_datetime(&NaiveDateTime::from_timestamp(
-            unixtime_us / 1_000_000,
-            (unixtime_us % 1_000_000 * 1000) as u32,
-        ))
+        .from_utc_datetime(
+            &NaiveDateTime::from_timestamp_opt(
+                unixtime_us / 1_000_000,
+                (unixtime_us % 1_000_000 * 1000) as u32,
+            )
+            .expect("unreachable"),
+        )
         .format("%Y-%m-%d %H:%M:%S")
         .to_string()
 }
@@ -220,11 +221,10 @@ pub enum SpanRef {
 }
 impl SpanRef {
     fn try_from_list(f: &List) -> Result<Vec<Self>> {
-        track!(
-            f.iter()
-                .map(|x| Self::try_from_data(&x))
-                .collect::<Result<Vec<_>>>()
-        )
+        track!(f
+            .iter()
+            .map(|x| Self::try_from_data(&x))
+            .collect::<Result<Vec<_>>>())
     }
     fn try_from_data(f: &DataRef) -> Result<Self> {
         let s = if let DataRef::Struct(s) = *f {
@@ -252,11 +252,10 @@ pub struct Log {
 }
 impl Log {
     fn try_from_list(f: &List) -> Result<Vec<Self>> {
-        track!(
-            f.iter()
-                .map(|x| Self::try_from_data(&x))
-                .collect::<Result<Vec<_>>>()
-        )
+        track!(f
+            .iter()
+            .map(|x| Self::try_from_data(&x))
+            .collect::<Result<Vec<_>>>())
     }
     fn try_from_data(f: &DataRef) -> Result<Self> {
         let s = if let DataRef::Struct(s) = *f {
