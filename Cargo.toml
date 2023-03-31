@@ -14,7 +14,7 @@ chrono = "0.4"
 clap = "2"
 serde = "1"
 serde_derive = "1"
-serdeconv = "0.3"
+serdeconv = "0.4"
 slog = {version = "2", features = ["release_max_level_debug"]}
 sloggers = "2"
 thrift_codec = "0.1"
