@@ -281,7 +281,7 @@ dependencies = [
  "slog",
  "sloggers",
  "thrift_codec",
- "trackable 0.2.24",
+ "trackable 1.3.0",
 ]
 
 [[package]]

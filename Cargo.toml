@@ -18,4 +18,4 @@ serdeconv = "0.4"
 slog = {version = "2", features = ["release_max_level_debug"]}
 sloggers = "2"
 thrift_codec = "0.1"
-trackable = "0.2"
+trackable = "1"
