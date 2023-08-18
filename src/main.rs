@@ -1,4 +1,3 @@
-#[macro_use]
 extern crate clap;
 extern crate jaegercat;
 extern crate serdeconv;
@@ -8,7 +7,7 @@ extern crate sloggers;
 #[macro_use]
 extern crate trackable;
 
-use clap::Arg;
+use clap::{Parser, ValueEnum};
 use jaegercat::thrift::{EmitBatchNotification, Protocol};
 use sloggers::terminal::{Destination, TerminalLoggerBuilder};
 use sloggers::types::SourceLocation;
@@ -24,74 +23,72 @@ macro_rules! try_parse {
     };
 }
 
-fn main() {
-    let matches = app_from_crate!()
-        .arg(
-            Arg::with_name("COMPACT_THRIFT_PORT")
-                .long("compact-thrift-port")
-                .takes_value(true)
-                .default_value("6831"),
-        )
-        .arg(
-            Arg::with_name("BINARY_THRIFT_PORT")
-                .long("binary-thrift-port")
-                .takes_value(true)
-                .default_value("6832"),
-        )
-        .arg(
-            Arg::with_name("FORMAT")
-                .short("f")
-                .long("format")
-                .takes_value(true)
-                .default_value("json")
-                .possible_values(&["raw", "json", "json-pretty"]),
-        )
-        .arg(
-            Arg::with_name("UDP_BUFFER_SIZE")
-                .short("b")
-                .long("udp-buffer-size")
-                .takes_value(true)
-                .default_value("65000"),
-        )
-        .arg(
-            Arg::with_name("LOG_LEVEL")
-                .long("log-level")
-                .takes_value(true)
-                .default_value("info")
-                .possible_values(&["debug", "info", "error"]),
-        )
-        .get_matches();
+#[derive(Parser)]
+#[clap(version)]
+struct Args {
+    #[clap(long = "compact-thrift-port", default_value_t = 6831)]
+    compact_thrift_port: u16,
 
-    let compact_thrift_port: u16 = try_parse!(matches.value_of("COMPACT_THRIFT_PORT").unwrap());
-    let binary_thrift_port: u16 = try_parse!(matches.value_of("BINARY_THRIFT_PORT").unwrap());
-    let udp_buffer_size: usize = try_parse!(matches.value_of("UDP_BUFFER_SIZE").unwrap());
-    let format = match matches.value_of("FORMAT").unwrap() {
-        "raw" => Format::Raw,
-        "json" => Format::Json,
-        "json-pretty" => Format::JsonPretty,
-        _ => unreachable!(),
+    #[clap(long = "binary-thrift-port", default_value_t = 6832)]
+    binary_thrift_port: u16,
+
+    #[clap(short = 'f', long = "format", default_value = "json")]
+    format: FormatArg,
+
+    #[clap(short = 'b', long = "udp-buffer-size", default_value_t = 65000)]
+    udp_buffer_size: usize,
+
+    #[clap(long = "log-level", default_value = "info")]
+    log_level: LogLevelArg,
+}
+
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
+enum FormatArg {
+    Raw,
+    Json,
+    JsonPretty,
+}
+
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
+enum LogLevelArg {
+    Debug,
+    Info,
+    Error,
+}
+
+fn main() {
+    let args = Args::parse();
+
+    let format = match args.format {
+        FormatArg::Raw => Format::Raw,
+        FormatArg::Json => Format::Json,
+        FormatArg::JsonPretty => Format::JsonPretty,
     };
-    let log_level = try_parse!(matches.value_of("LOG_LEVEL").unwrap());
-    let logger = track_try_unwrap!(
-        TerminalLoggerBuilder::new()
-            .source_location(SourceLocation::None)
-            .destination(Destination::Stderr)
-            .level(log_level)
-            .build()
-    );
+    let log_level = match args.log_level {
+        LogLevelArg::Debug => sloggers::types::Severity::Debug,
+        LogLevelArg::Info => sloggers::types::Severity::Info,
+        LogLevelArg::Error => sloggers::types::Severity::Error,
+    };
+    let logger = track_try_unwrap!(TerminalLoggerBuilder::new()
+        .source_location(SourceLocation::None)
+        .destination(Destination::Stderr)
+        .level(log_level)
+        .build());
 
     let mut threads = Vec::new();
     for (port, protocol) in [
-        (compact_thrift_port, Protocol::Compact),
-        (binary_thrift_port, Protocol::Binary),
-    ].iter()
-        .cloned()
+        (args.compact_thrift_port, Protocol::Compact),
+        (args.binary_thrift_port, Protocol::Binary),
+    ]
+    .iter()
+    .cloned()
     {
         let addr: SocketAddr = try_parse!(format!("0.0.0.0:{}", port));
         let socket = track_try_unwrap!(UdpSocket::bind(addr).map_err(Failure::from_error));
         let logger = logger.new(o!("port" => port, "thrift_protocol" => format!("{:?}", protocol)));
         info!(logger, "UDP server started");
 
+        let udp_buffer_size = args.udp_buffer_size;
         let thread = thread::spawn(move || {
             let mut buf = vec![0; udp_buffer_size];
             loop {
