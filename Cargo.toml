@@ -10,12 +10,12 @@ keywords = ["jaeger"]
 license = "MIT"
 
 [dependencies]
-chrono = { version = "0.4", default-features=false }
+chrono = { version = "0.4" }
 clap = { version = "4", features = ["derive"] }
+env_logger = "0.10.0"
+log = "0.4.20"
 serde = "1"
 serde_derive = "1"
 serdeconv = "0.4"
-slog = {version = "2", features = ["release_max_level_debug"]}
-sloggers = "2"
 thrift_codec = "0.1"
 trackable = "1"

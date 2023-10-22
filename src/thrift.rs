@@ -1,10 +1,9 @@
-use chrono::{Local, NaiveDateTime, TimeZone};
+use chrono::{offset::Local, NaiveDateTime, TimeZone};
 use std::collections::BTreeMap;
 use thrift_codec::data::{Data, DataRef, List, Struct};
 use thrift_codec::message::{Message, MessageKind};
 use thrift_codec::{BinaryDecode, CompactDecode};
 use trackable::error::{ErrorKindExt, Failed, Failure};
-
 use Result;
 
 #[derive(Debug, Clone, Copy)]

@@ -2,16 +2,10 @@ extern crate clap;
 extern crate jaegercat;
 extern crate serdeconv;
 #[macro_use]
-extern crate slog;
-extern crate sloggers;
-#[macro_use]
 extern crate trackable;
 
 use clap::{Parser, ValueEnum};
 use jaegercat::thrift::{EmitBatchNotification, Protocol};
-use sloggers::terminal::{Destination, TerminalLoggerBuilder};
-use sloggers::types::SourceLocation;
-use sloggers::Build;
 use std::io::{self, Write};
 use std::net::{SocketAddr, UdpSocket};
 use std::thread;
@@ -37,9 +31,6 @@ struct Args {
 
     #[clap(short = 'b', long = "udp-buffer-size", default_value_t = 65000)]
     udp_buffer_size: usize,
-
-    #[clap(long = "log-level", default_value = "info")]
-    log_level: LogLevelArg,
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
@@ -57,6 +48,8 @@ enum LogLevelArg {
 }
 
 fn main() {
+    env_logger::init();
+
     let args = Args::parse();
 
     let format = match args.format {
@@ -64,16 +57,6 @@ fn main() {
         FormatArg::Json => Format::Json,
         FormatArg::JsonPretty => Format::JsonPretty,
     };
-    let log_level = match args.log_level {
-        LogLevelArg::Debug => sloggers::types::Severity::Debug,
-        LogLevelArg::Info => sloggers::types::Severity::Info,
-        LogLevelArg::Error => sloggers::types::Severity::Error,
-    };
-    let logger = track_try_unwrap!(TerminalLoggerBuilder::new()
-        .source_location(SourceLocation::None)
-        .destination(Destination::Stderr)
-        .level(log_level)
-        .build());
 
     let mut threads = Vec::new();
     for (port, protocol) in [
@@ -85,8 +68,7 @@ fn main() {
     {
         let addr: SocketAddr = try_parse!(format!("0.0.0.0:{}", port));
         let socket = track_try_unwrap!(UdpSocket::bind(addr).map_err(Failure::from_error));
-        let logger = logger.new(o!("port" => port, "thrift_protocol" => format!("{:?}", protocol)));
-        info!(logger, "UDP server started");
+        log::info!("UDP server started: port={port}, protocol={protocol:?}");
 
         let udp_buffer_size = args.udp_buffer_size;
         let thread = thread::spawn(move || {
@@ -94,12 +76,12 @@ fn main() {
             loop {
                 let (recv_size, peer) =
                     track_try_unwrap!(socket.recv_from(&mut buf).map_err(Failure::from_error));
-                debug!(logger, "Received {} bytes from {}", recv_size, peer);
+                log::debug!("Received {recv_size} bytes from {peer}");
                 let mut bytes = &buf[..recv_size];
                 match track!(EmitBatchNotification::decode(bytes, protocol)) {
                     Err(e) => {
-                        error!(logger, "Received malformed or unknown message: {}", e);
-                        debug!(logger, "Bytes: {:?}", bytes);
+                        log::error!("Received malformed or unknown message: {e}");
+                        log::debug!("Bytes: {bytes:?}");
                     }
                     Ok(message) => {
                         let stdout = io::stdout();
