@@ -1,15 +1,10 @@
-extern crate clap;
-extern crate jaegercat;
-extern crate serdeconv;
-#[macro_use]
-extern crate trackable;
-
 use clap::{Parser, ValueEnum};
 use jaegercat::thrift::{EmitBatchNotification, Protocol};
 use std::io::{self, Write};
 use std::net::{SocketAddr, UdpSocket};
 use std::thread;
 use trackable::error::Failure;
+use trackable::{track, track_try_unwrap};
 
 macro_rules! try_parse {
     ($expr:expr) => {
