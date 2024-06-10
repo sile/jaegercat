@@ -8,14 +8,14 @@ repository = "https://github.com/sile/jaegercat"
 readme = "README.md"
 keywords = ["jaeger"]
 license = "MIT"
+edition = "2021"
 
 [dependencies]
 chrono = { version = "0.4" }
 clap = { version = "4", features = ["derive"] }
 env_logger = "0.11.3"
 log = "0.4.20"
-serde = "1"
-serde_derive = "1"
+serde = { version = "1", features = ["derive"] }
 serdeconv = "0.4"
 thrift_codec = "0.3"
 trackable = "1"
