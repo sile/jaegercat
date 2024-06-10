@@ -12,10 +12,10 @@ license = "MIT"
 [dependencies]
 chrono = { version = "0.4" }
 clap = { version = "4", features = ["derive"] }
-env_logger = "0.10.0"
+env_logger = "0.11.3"
 log = "0.4.20"
 serde = "1"
 serde_derive = "1"
 serdeconv = "0.4"
-thrift_codec = "0.1"
+thrift_codec = "0.3"
 trackable = "1"
