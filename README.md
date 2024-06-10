@@ -1,7 +1,7 @@
 jaegercat
 =========
 
-[![jaegercat](http://meritbadge.herokuapp.com/jaegercat)](https://crates.io/crates/jaegercat)
+[![jaegercat](https://img.shields.io/crates/v/jaegercat.svg)](https://crates.io/crates/jaegercat)
 [![Documentation](https://docs.rs/jaegercat/badge.svg)](https://docs.rs/jaegercat)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
